@@ -15,3 +15,7 @@ the DI is used on login to your chromeos device. the hd will change depending on
 
 ## how was the URL found?
 although it's likely that you could've just looked through google source code of chromeos for webview usage on OOBE to find this URL, it was found by trafficking through strict cloudflare restrictions on a proxy, leading to chromeos webview saying the site couldn't be reached, and literally saying the URL. 
+
+## READ THIS
+update: `` hd=* ``: Forces Google to ask for an account from any managed Google Workspace domain (blocking standard @gmail.com personal accounts).
+you could probably still remove the hd parameter entirely.
