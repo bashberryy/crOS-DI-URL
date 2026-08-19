@@ -42,3 +42,5 @@ these are the URLs found while tracing the chromeos OOBE google sign-in flow.
 update: `hd=*`: Forces Google to ask for an account from any managed Google Workspace domain (blocking standard @gmail.com personal accounts). you could probably still remove the hd parameter entirely.
 
 none of the URLs above, by themselves, prove that the DI can be bypassed. the important part is that `hd` is supplied as part of the ChromeOS device-enrollment sign-in flow. changing it would require control over the OOBE webview/navigation rather than simply editing a normal browser URL.
+
+recovery in chromeos webview: https://accounts.google.com/v3/signin/recoveryidentifier?flowName=GlifSetupChromeOs&dsh=S-368440106%3A1787169239399889
