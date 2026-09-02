@@ -49,7 +49,7 @@ one of the coolest things to edit enrollment state that I found was that when go
 
 ** ok, I just heard that someone just found this and I'm completely uncredited. here is the script they wrote for my theory to work. open a compiler that supports python and run this. please do not do this on an unauthorized device, I do not encourage that. this is just a cool little thing.
 
-``
+```
 import uuid
 import time
 import requests
@@ -135,4 +135,4 @@ data = proto.DeviceManagementResponse()
 data.ParseFromString(response.content)
 
 print(data)
-``
+```
